@@ -1,46 +1,17 @@
 import csv
 import json
+import pathlib
 import time
 
-from graphql import graphql_request
-
-
-def create_collection(title):
-    query = """
-    mutation createCollectionMetafields($input: CollectionInput!) {
-      collectionCreate(input: $input) {
-        collection {
-          id
-          title
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-    """
-    variables = {"input": {"title": title}}
-    data = graphql_request(query, variables)
-    print(data)
-    return data["data"]["collectionCreate"]["collection"]["id"]
-
-
-def add_product_to_collection(product_id, collection_id):
-    query = """
-    mutation {
-      collectionAddProducts(collectionId: "%s", productIds: ["%s"]) {
-        collection {
-          title
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-    """ % (collection_id, product_id)
-    graphql_request(query)
+from services.automation.core import automation_main
+from services.graphql.graphql import graphql_request
+from services.graphql.queries import (
+    CREATE_PRODUCT_MEDIA_QUERY,
+    CREATE_PRODUCT_QUERY,
+    CREATE_VARIANT_QUERY,
+)
+from services.s_collections import add_product_to_collection, create_collection
+from services.s_theme import upload_shopify_theme
 
 
 def create_product_from_csv_row(row):
@@ -53,11 +24,17 @@ def create_product_from_csv_row(row):
 
     # Handle options (like Cor, Tamanho)
     if row["Option1 Name"]:
-        options.append({"name": row["Option1 Name"], "values": [row["Option1 Value"]]})
+        options.append(
+            {"name": row["Option1 Name"], "values": {"name": row["Option1 Value"]}}
+        )
     if row["Option2 Name"]:
-        options.append({"name": row["Option2 Name"], "values": [row["Option2 Value"]]})
+        options.append(
+            {"name": row["Option2 Name"], "values": {"name": row["Option2 Value"]}}
+        )
     if row["Option3 Name"]:
-        options.append({"name": row["Option3 Name"], "values": [row["Option3 Value"]]})
+        options.append(
+            {"name": row["Option3 Name"], "values": {"name": row["Option3 Value"]}}
+        )
 
     # Prepare variant
     variant = {
@@ -68,75 +45,103 @@ def create_product_from_csv_row(row):
         "inventoryManagement": row["Variant Inventory Tracker"] or None,
         "inventoryPolicy": row["Variant Inventory Policy"] or "continue",
         "fulfillmentService": row["Variant Fulfillment Service"] or "manual",
-        "weight": float(row["Variant Grams"] or 0) / 1000.0,  # convert grams to kg
+        "weight": float(row["Variant Grams"] or 0) / 1000.0,
         "weightUnit": row["Variant Weight Unit"] or "kg",
     }
 
     # Build product input for GraphQL
     product_input = {
         "title": title,
-        "bodyHtml": body_html,
+        "descriptionHtml": body_html,
         "vendor": vendor,
         "productType": product_type,
         "tags": tags,
-        "options": options,
-        "variants": [variant],
+        "productOptions": options,
     }
+    product_media = []
 
     # Add image
     if row["Image Src"]:
-        product_input["images"] = [{"src": row["Image Src"]}]
+        product_media.append(
+            {"originalSource": row["Image Src"], "mediaContentType": "IMAGE"}
+        )
+
         # Variant image
+        # TODO ADD VARIANT IMAGE IN PRODUCT VARIANT
         if row["Variant Image"]:
-            variant["image"] = {"src": row["Variant Image"]}
+            product_media.append(
+                {
+                    "originalSource": row["Variant Image"],
+                    "mediaContentType": "IMAGE",
+                }
+            )
 
     # GraphQL mutation
-    query = """
-    mutation productCreate($input: ProductInput!) {
-      productCreate(input: $input) {
-        product {
-          id
-          title
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-    """
-    result = graphql_request(query, {"input": product_input})
+    query = CREATE_PRODUCT_QUERY
+    result = graphql_request(query, {"product": product_input})
+
+    # === create media ===
+    media_query = CREATE_PRODUCT_MEDIA_QUERY
+    product_id = result["data"]["productCreate"]["product"]["id"]
+
+    if product_media:
+        result_media = graphql_request(
+            media_query,
+            {
+                "media": product_media,
+                "productId": product_id,
+            },
+        )
+
+    # ==== create variant ====
+    variant_query = CREATE_VARIANT_QUERY
+
+    variant_result = graphql_request(
+        variant_query,
+        {
+            "productId": product_id,
+            "variant": [variant],
+        },
+    )
+
     return result["data"]["productCreate"]
 
 
 def main():
-    with open("collections.json") as f:
-        collections = json.load(f)
+    upload_shopify_theme(
+        (pathlib.Path(__file__).parent / "assets" / "Tema_Vitrine_Latam")
+    )
 
+    raise
+
+    with open("collections.json", encoding="utf-8") as f:
+        collections = json.load(f)
     collection_ids = {}
+
     for name in collections:
-        print(f"Creating collection: {name}")
         collection_id = create_collection(name)
         collection_ids[name] = collection_id
-        time.sleep(0.5)  # Respect rate limits
+        # wait rate limit
+        time.sleep(0.5)
 
-    with open("100_spanish_products.csv", newline="") as csvfile:
+    with open("100_spanish_products.csv", newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            print(f"Creating product: {row['title']}")
             product_id = create_product_from_csv_row(row)
             time.sleep(0.5)
 
             best_collection_id = collection_ids.get("Best Products")
             if best_collection_id:
-                print(f"Adding {row['title']} to Best Products")
                 add_product_to_collection(product_id, best_collection_id)
                 time.sleep(0.5)
 
 
+def run_automation():
+    automation_main()
+
+
 if __name__ == "__main__":
-    input("digite o token")
-    main()
+    run_automation()
 
 
 # path to create api token
