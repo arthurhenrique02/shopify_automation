@@ -32,4 +32,6 @@ def open_theme_access_download_page(driver: WebDriver) -> str:
         "window.open('https://apps.shopify.com/theme-access', '_blank');"
     )
 
+    driver.switch_to.window(driver.window_handles[-1])
+
     return handler
