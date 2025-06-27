@@ -6,7 +6,11 @@ from services.automation.auth import login
 from services.automation.navigation import (
     go_to_shopify_login_page,
 )
-from services.automation.utils import download_theme_access, initialize_driver
+from services.automation.utils import (
+    create_theme_access_password,
+    download_theme_access,
+    initialize_driver,
+)
 
 load_dotenv()
 
@@ -23,6 +27,15 @@ def automation_main():
     if not success:
         print(
             "Failed to download theme access. Please check your credentials and try again."
+        )
+        driver.quit()
+        return
+
+    success = create_theme_access_password(driver)
+
+    if not success:
+        print(
+            "Failed to retrieve theme access password. Please check your credentials."
         )
         driver.quit()
         return

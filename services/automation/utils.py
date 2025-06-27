@@ -1,3 +1,5 @@
+import os
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -56,14 +58,22 @@ def download_theme_access(driver: WebDriver) -> tuple[bool, str]:
     """
     old_handler = open_theme_access_download_page(driver)
 
-    WebDriverWait(driver, 10).until(
+    install_btn = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located(
             (By.XPATH, "//*[@id='analytics-viewItem']/form/button")
         )
-    ).click()
+    )
+
+    install_btn.click()
+
+    # if downloaded, just go to the new tab
+    if install_btn.text.strip().lower() in ["open", "abrir"]:
+        driver.switch_to.window(driver.window_handles[-1])
+        return True, old_handler
 
     driver.switch_to.window(driver.window_handles[-1])
 
+    # click to install
     WebDriverWait(driver, 15).until(
         EC.element_to_be_clickable(
             (
@@ -76,17 +86,52 @@ def download_theme_access(driver: WebDriver) -> tuple[bool, str]:
     return True, old_handler
 
 
-def get_theme_access_password(driver: WebDriver) -> str:
+def create_theme_access_password(driver: WebDriver) -> str:
     """
     Get the theme access password from the Shopify admin page.
     :param driver: Selenium WebDriver instance
     :return: Theme access password as a string
     """
+    driver.switch_to.frame(
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//iframe"))
+        )
+    )
 
+    # click create token link
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located(
             (By.XPATH, "//*[@class='Polaris-InlineStack_bc7jt']/a[2]")
         )
     ).click()
 
-    # TODO SEND CREDENTIALS EMAIL TO GET TOKEN
+    inputs = WebDriverWait(driver, 10).until(
+        EC.presence_of_all_elements_located((By.XPATH, "//form//input"))
+    )
+
+    for ie in inputs:
+        if ie.get_attribute("type") == "text":
+            ie.send_keys("Automation Theme Access")
+        elif ie.get_attribute("type") == "email":
+            ie.send_keys(os.getenv("EMAIL_TO_RECEIVE_KEYS"))
+
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (
+                By.XPATH,
+                "//form//div[@class='Polaris-LegacyStack__Item_yiyol']//button[@type='submit']",
+            )
+        )
+    ).click()
+
+    return True
+
+
+def get_theme_access_password_from_email(driver: WebDriver) -> str:
+    """
+    Get the theme access password from the email.
+    :param driver: Selenium WebDriver instance
+    :return: Theme access password as a string
+    """
+
+    # TODO GET TOKEN FROM EMAIL
