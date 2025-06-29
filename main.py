@@ -141,7 +141,12 @@ def run_automation():
 
 
 if __name__ == "__main__":
-    run_automation()
+    # run_automation()
+    from services.automation.utils import (
+        conn_gmail_imap,
+    )
+
+    conn_gmail_imap()
 
 
 # path to create api token

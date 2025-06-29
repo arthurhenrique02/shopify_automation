@@ -1,4 +1,6 @@
+import imaplib
 import os
+import typing
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -135,3 +137,31 @@ def get_theme_access_password_from_email(driver: WebDriver) -> str:
     """
 
     # TODO GET TOKEN FROM EMAIL
+    mailbox = conn_gmail_imap()
+
+
+def conn_gmail_imap() -> typing.Generator[imaplib.IMAP4_SSL, None, None]:
+    """
+    Connect to Gmail using IMAP.
+    :return: IMAP connection object
+    """
+    try:
+        email = os.getenv("EMAIL_TO_RECEIVE_KEYS")
+        password = os.getenv("EMAIL_RECEIVER_PASS")
+
+        imap = imaplib.IMAP4_SSL("imap.gmail.com")
+        imap.login(email, password)
+        imap.select("inbox")
+        yield imap
+    except imaplib.IMAP4.error as e:
+        # TODO: CHANGE TO LOGGER
+        print(f"IMAP error: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        if not imap.closed:
+            print("No IMAP connection to close.")
+            return
+
+        imap.logout()
+        print("IMAP connection closed.")
