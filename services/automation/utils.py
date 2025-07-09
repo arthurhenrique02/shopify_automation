@@ -1,6 +1,7 @@
+import contextlib
 import imaplib
 import os
-import typing
+import re
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -12,6 +13,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from services.automation.navigation import (
     open_theme_access_download_page,
 )
+
+LINK_TAG_RE = re.compile(r'<a href=3D"([^"]+)"[^>]*>.*recuse a senha.*</a>', re.DOTALL)
 
 
 def initialize_driver():
@@ -129,18 +132,78 @@ def create_theme_access_password(driver: WebDriver) -> str:
     return True
 
 
-def get_theme_access_password_from_email(driver: WebDriver) -> str:
+def get_theme_access_password_from_email(driver: WebDriver = None) -> str:
     """
     Get the theme access password from the email.
     :param driver: Selenium WebDriver instance
     :return: Theme access password as a string
     """
 
-    # TODO GET TOKEN FROM EMAIL
     mailbox = conn_gmail_imap()
 
+    if not mailbox:
+        print("Failed to connect to the mailbox.")
+        return ""
 
-def conn_gmail_imap() -> typing.Generator[imaplib.IMAP4_SSL, None, None]:
+    with contextlib.closing(mailbox) as imap:
+        try:
+            # Search for the email with the theme access password
+            status, messages = imap.search(None, 'FROM "theme-access@shopify.com"')
+
+            if status != "OK":
+                print("No messages found.")
+                return ""
+
+            latest_email_id = messages[0].split()[-1]
+
+            # Fetch email body
+            status, msg_data = imap.fetch(latest_email_id, "(RFC822)")
+            if status != "OK":
+                print("Failed to fetch email.")
+                return ""
+
+            email_body = msg_data[0][1].decode("utf-8")
+            href_link = LINK_TAG_RE.search(email_body).group(1)
+
+            if not href_link:
+                print("No theme access link found in the email.")
+                return ""
+
+            # replace line breaks
+            href_link = href_link.replace("\n", "").replace("=\r", "")
+
+            print(f"Theme access link: {href_link}")
+
+            driver.execute_script(f"window.open('{href_link}', '_blank');")
+
+            # Wait for the new tab to open and switch to it
+            WebDriverWait(driver, 10).until(lambda d: len(d.window_handles) > 1)
+
+            # TODO GET TOKEN KEY
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        "//div[@class='Polaris-LegacyStack__Item_yiyol']//button[@type='button']",
+                    )
+                )
+            ).click()
+
+            # TODO: TEST IF WORKING & REMOVE TEST PRINTS
+            # Get the theme access token from the page
+            token_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//div[@class='Polaris-TextField_1spwi']//input")
+                )
+            )
+            print(f"Theme access token: {token_element.get_attribute('value')}")
+            return token_element.get_attribute("value")
+        except imaplib.IMAP4.error as e:
+            print(f"IMAP error: {e}")
+            return ""
+
+
+def conn_gmail_imap() -> imaplib.IMAP4_SSL | None:
     """
     Connect to Gmail using IMAP.
     :return: IMAP connection object
@@ -152,16 +215,9 @@ def conn_gmail_imap() -> typing.Generator[imaplib.IMAP4_SSL, None, None]:
         imap = imaplib.IMAP4_SSL("imap.gmail.com")
         imap.login(email, password)
         imap.select("inbox")
-        yield imap
+        return imap
     except imaplib.IMAP4.error as e:
         # TODO: CHANGE TO LOGGER
         print(f"IMAP error: {e}")
     except Exception as e:
         print(f"An error occurred: {e}")
-    finally:
-        if not imap.closed:
-            print("No IMAP connection to close.")
-            return
-
-        imap.logout()
-        print("IMAP connection closed.")

@@ -9,6 +9,7 @@ from services.automation.navigation import (
 from services.automation.utils import (
     create_theme_access_password,
     download_theme_access,
+    get_theme_access_password_from_email,
     initialize_driver,
 )
 
@@ -39,6 +40,10 @@ def automation_main():
         )
         driver.quit()
         return
+
+    theme_access_password = get_theme_access_password_from_email(driver)
+
+    # TODO: CREATE CUSTOM APP
 
     # keep browser alive
     input("Press Enter to close the browser...")
