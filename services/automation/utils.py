@@ -2,19 +2,21 @@ import contextlib
 import imaplib
 import os
 import re
+import time
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import Select, WebDriverWait
 
 from services.automation.navigation import (
     open_theme_access_download_page,
 )
 
-LINK_TAG_RE = re.compile(r'<a href=3D"([^"]+)"[^>]*>.*recuse a senha.*</a>', re.DOTALL)
+LINK_TAG_RE = re.compile(r'<a href=3D"([^"]+)"[^>]*>.*Get password.*</a>', re.DOTALL)
 
 
 def initialize_driver():
@@ -104,11 +106,18 @@ def create_theme_access_password(driver: WebDriver) -> str:
     )
 
     # click create token link
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located(
-            (By.XPATH, "//*[@class='Polaris-InlineStack_bc7jt']/a[2]")
-        )
-    ).click()
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//*[@class='Polaris-InlineStack_bc7jt']/a[2]")
+            )
+        ).click()
+    except TimeoutException:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//*[@class='Polaris-Box_375yx']//a")
+            )
+        ).click()
 
     inputs = WebDriverWait(driver, 10).until(
         EC.presence_of_all_elements_located((By.XPATH, "//form//input"))
@@ -119,6 +128,9 @@ def create_theme_access_password(driver: WebDriver) -> str:
             ie.send_keys("Automation Theme Access")
         elif ie.get_attribute("type") == "email":
             ie.send_keys(os.getenv("EMAIL_TO_RECEIVE_KEYS"))
+
+    # set select value to en
+    Select(driver.find_element(By.XPATH, "//form//select")).select_by_value("en")
 
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located(
@@ -132,12 +144,15 @@ def create_theme_access_password(driver: WebDriver) -> str:
     return True
 
 
-def get_theme_access_password_from_email(driver: WebDriver = None) -> str:
+def get_theme_access_password_from_email(driver: WebDriver, store_name: str) -> str:
     """
     Get the theme access password from the email.
     :param driver: Selenium WebDriver instance
     :return: Theme access password as a string
     """
+
+    # wait for the email to arrive
+    time.sleep(15)
 
     mailbox = conn_gmail_imap()
 
@@ -148,7 +163,10 @@ def get_theme_access_password_from_email(driver: WebDriver = None) -> str:
     with contextlib.closing(mailbox) as imap:
         try:
             # Search for the email with the theme access password
-            status, messages = imap.search(None, 'FROM "theme-access@shopify.com"')
+            status, messages = imap.search(
+                None,
+                f'SUBJECT "{store_name}"',
+            )
 
             if status != "OK":
                 print("No messages found.")
@@ -172,14 +190,13 @@ def get_theme_access_password_from_email(driver: WebDriver = None) -> str:
             # replace line breaks
             href_link = href_link.replace("\n", "").replace("=\r", "")
 
-            print(f"Theme access link: {href_link}")
-
             driver.execute_script(f"window.open('{href_link}', '_blank');")
 
             # Wait for the new tab to open and switch to it
             WebDriverWait(driver, 10).until(lambda d: len(d.window_handles) > 1)
 
-            # TODO GET TOKEN KEY
+            driver.switch_to.window(driver.window_handles[-1])
+
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located(
                     (
@@ -193,14 +210,49 @@ def get_theme_access_password_from_email(driver: WebDriver = None) -> str:
             # Get the theme access token from the page
             token_element = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located(
-                    (By.XPATH, "//div[@class='Polaris-TextField_1spwi']//input")
+                    (
+                        By.XPATH,
+                        "//div[contains(@class, 'Polaris-TextField_1spwi')]//input",
+                    )
                 )
             )
-            print(f"Theme access token: {token_element.get_attribute('value')}")
             return token_element.get_attribute("value")
         except imaplib.IMAP4.error as e:
             print(f"IMAP error: {e}")
             return ""
+
+
+def enable_custom_dev_mode(driver: WebDriver) -> bool:
+    """
+    Enable custom development mode in the Shopify admin page.
+    :param driver: Selenium WebDriver instance
+    :return: True if successful, False otherwise
+    """
+    try:
+        # Navigate to the custom development mode page
+        driver.get(
+            "https://your-shopify-store.myshopify.com/admin/settings/development"
+        )
+
+        # Find and click the enable button
+        try:
+            WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//a[contains(class, 'Polaris-Button')]")
+                )
+            ).click()
+        except Exception:
+            enable_link = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//a[contains(class, 'Polaris-Button')]")
+                )
+            )
+            href = enable_link.get_attribute("href")
+
+        return True
+    except Exception as e:
+        print(f"Error enabling custom dev mode: {e}")
+        return False
 
 
 def conn_gmail_imap() -> imaplib.IMAP4_SSL | None:
