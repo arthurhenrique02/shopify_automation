@@ -10,6 +10,7 @@ from services.automation.navigation import (
 from services.automation.utils import (
     create_theme_access_password,
     download_theme_access,
+    enable_custom_dev_mode,
     get_theme_access_password_from_email,
     initialize_driver,
 )
@@ -51,6 +52,9 @@ def automation_main():
     driver.switch_to.window(old_handler)
 
     old_handler = open_create_app_page(driver)
+
+    driver.switch_to.window(driver.window_handles[-1])
+    enable_custom_dev_mode(driver)
 
     if not success:
         print("Failed to open the create app page. Please check your credentials.")

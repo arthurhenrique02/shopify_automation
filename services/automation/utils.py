@@ -206,7 +206,6 @@ def get_theme_access_password_from_email(driver: WebDriver, store_name: str) -> 
                 )
             ).click()
 
-            # TODO: TEST IF WORKING & REMOVE TEST PRINTS
             # Get the theme access token from the page
             token_element = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located(
@@ -228,31 +227,28 @@ def enable_custom_dev_mode(driver: WebDriver) -> bool:
     :param driver: Selenium WebDriver instance
     :return: True if successful, False otherwise
     """
-    try:
-        # Navigate to the custom development mode page
-        driver.get(
-            "https://your-shopify-store.myshopify.com/admin/settings/development"
-        )
-
-        # Find and click the enable button
-        try:
-            WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, "//a[contains(class, 'Polaris-Button')]")
-                )
-            ).click()
-        except Exception:
-            enable_link = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, "//a[contains(class, 'Polaris-Button')]")
-                )
+    WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable(
+            (
+                By.XPATH,
+                "//div[@class='Polaris-Layout']//div[@class='Polaris-LegacyStack__Item']//a[contains(@class, 'Polaris-Button')]",
             )
-            href = enable_link.get_attribute("href")
+        )
+    ).click()
 
-        return True
-    except Exception as e:
-        print(f"Error enabling custom dev mode: {e}")
-        return False
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (
+                By.XPATH,
+                "//div[@class='Polaris-Layout']//div[@class='Polaris-ButtonGroup__Item']//button[@type='button']",
+            )
+        )
+    ).click()
+
+
+def create_custom_app(driver: WebDriver) -> bool:
+    # TODO CREATE CUSTOM APP
+    ...
 
 
 def conn_gmail_imap() -> imaplib.IMAP4_SSL | None:
