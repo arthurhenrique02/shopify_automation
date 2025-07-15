@@ -13,6 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
 from services.automation.navigation import (
+    open_create_app_page,
     open_theme_access_download_page,
 )
 
@@ -247,8 +248,150 @@ def enable_custom_dev_mode(driver: WebDriver) -> bool:
 
 
 def create_custom_app(driver: WebDriver) -> bool:
-    # TODO CREATE CUSTOM APP
-    ...
+    """
+    Create a custom app in the Shopify admin page. On creation, redirect to the app's page.
+    :param driver: Selenium WebDriver instance
+    :return: True if successful, False otherwise
+    """
+
+    # click to create a new app
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(
+                (
+                    By.XPATH,
+                    "//div[@class='Polaris-Layout']//div[@class='Polaris-InlineStack']//button[contains(@class, 'Polaris-Button') and @type='button']",
+                )
+            )
+        ).click()
+    except TimeoutException:
+        # an app already exists, need to click the button to create a new one
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(
+                (
+                    By.XPATH,
+                    "//div[@class='Polaris-Page']//div[contains(@class, 'Polaris-Box')]//button[contains(@class, 'Polaris-Button') and @type='button']",
+                )
+            )
+        ).click()
+    except Exception as e:
+        print(f"An error occurred while trying to create a custom app: {e}")
+        return False
+
+    # get input and type the app name and save
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (
+                By.XPATH,
+                "//div[@class='Polaris-Modal-Dialog__Modal']//div[contains(@class, 'Polaris-FormLayout__Item')]//input[@class='Polaris-TextField__Input']",
+            )
+        )
+    ).send_keys("Automation Custom App")
+
+    # curr url to check his changes after app created and redirected to his page
+    curr_url = driver.current_url
+
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (
+                By.XPATH,
+                "//div[@class='Polaris-Modal-Dialog__Modal']//div[@class='Polaris-InlineStack']//button[contains(@class, 'Polaris-Button')][2]",
+            )
+        )
+    ).click()
+
+    try:
+        # detect url changes
+        WebDriverWait(driver, 10).until(EC.url_changes(curr_url))
+    except TimeoutException:
+        print("Failed to detect URL change after creating the app.")
+        return False
+
+    return True
+
+
+def define_custom_app_permissions(driver: WebDriver) -> bool:
+    """
+    Define the permissions for the custom app in the Shopify admin page. On success, it will redirect to the app's credentials page.
+    :param driver: Selenium WebDriver instance
+    :return: True if successful, False otherwise
+    """
+
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (
+                By.XPATH,
+                "//div[@class='Polaris-LegacyCard']//div[contains(@class,'Polaris-LegacyCard__Section')]//a[contains(@class, 'Polaris-Button')][1]",
+            )
+        )
+    ).click()
+
+    checkboxes = WebDriverWait(driver, 10).until(
+        EC.presence_of_all_elements_located(
+            (
+                By.XPATH,
+                "//input[@type='checkbox' and contains(@class, 'Polaris-Checkbox__Input')]",
+            )
+        )
+    )
+
+    for checkbox in checkboxes:
+        if checkbox.is_selected():
+            continue
+
+        checkbox.click()
+
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located(
+                (
+                    By.XPATH,
+                    "//div[@class='Polaris-LegacyStack__Item']//div[@class='Polaris-ButtonGroup']//button[contains(@class, 'Polaris-Button') and @type='button']",
+                )
+            )
+        )[-1].click()
+    except TimeoutException:
+        print("Failed to click the save button for permissions.")
+        return False
+
+    return True
+
+
+def get_custom_app_api_key(driver: WebDriver) -> str:
+    """
+    Get the custom app API key from the Shopify admin page.
+    :param driver: Selenium WebDriver instance
+    :return: Custom app API key as a string
+    """
+    old_handler = open_create_app_page(driver)
+
+    driver.switch_to.window(driver.window_handles[-1])
+
+    try:
+        enable_custom_dev_mode(driver)
+    except TimeoutException:
+        print("Development mode is already enabled.")
+    except Exception as e:
+        print(f"An error occurred while enabling development mode: {e}")
+        return ""
+
+    success = create_custom_app(driver)
+
+    if not success:
+        print("Failed to create custom app. Please check your credentials.")
+        driver.quit()
+        return ""
+
+    success = define_custom_app_permissions(driver)
+
+    if not success:
+        print("Failed to define custom app permissions. Please check your credentials.")
+        driver.quit()
+        return ""
+
+    # TODO GET API KEY
+
+    return ""
 
 
 def conn_gmail_imap() -> imaplib.IMAP4_SSL | None:
