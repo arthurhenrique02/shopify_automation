@@ -5,12 +5,11 @@ from dotenv import load_dotenv
 from services.automation.auth import login
 from services.automation.navigation import (
     go_to_shopify_login_page,
-    open_create_app_page,
 )
 from services.automation.utils import (
     create_theme_access_password,
     download_theme_access,
-    enable_custom_dev_mode,
+    get_custom_app_api_key,
     get_theme_access_password_from_email,
     initialize_driver,
 )
@@ -47,17 +46,22 @@ def automation_main():
 
     theme_access_password = get_theme_access_password_from_email(driver, store_name)
 
-    # TODO: CREATE CUSTOM APP
+    if not theme_access_password:
+        print(
+            "Failed to retrieve theme access password from email. Please check your email settings."
+        )
+        driver.quit()
+        return
+
     driver.close()
     driver.switch_to.window(old_handler)
 
-    old_handler = open_create_app_page(driver)
+    api_key = get_custom_app_api_key(driver=driver)
 
-    driver.switch_to.window(driver.window_handles[-1])
-    enable_custom_dev_mode(driver)
-
-    if not success:
-        print("Failed to open the create app page. Please check your credentials.")
+    if not api_key:
+        print(
+            "Failed to retrieve the custom app API key. Please check your credentials."
+        )
         driver.quit()
         return
 
