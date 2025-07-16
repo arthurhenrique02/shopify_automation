@@ -12,6 +12,7 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
+from services.automation.auth import conn_gmail_imap
 from services.automation.navigation import (
     open_create_app_page,
     open_theme_access_download_page,
@@ -228,6 +229,7 @@ def enable_custom_dev_mode(driver: WebDriver) -> bool:
     :param driver: Selenium WebDriver instance
     :return: True if successful, False otherwise
     """
+
     WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable(
             (
@@ -363,6 +365,10 @@ def get_custom_app_api_key(driver: WebDriver) -> str:
     :param driver: Selenium WebDriver instance
     :return: Custom app API key as a string
     """
+
+    SLEEP_TIME = 5
+    SHORT_SLEEP_TIME = 1
+
     old_handler = open_create_app_page(driver)
 
     driver.switch_to.window(driver.window_handles[-1])
@@ -389,26 +395,79 @@ def get_custom_app_api_key(driver: WebDriver) -> str:
         driver.quit()
         return ""
 
-    # TODO GET API KEY
+    cred_url = "/".join([*driver.current_url.split("/")[:-2], "api_credentials"])
 
-    return ""
+    # wait to ensure the page will be correctly loaded when redirect
+    # (button to install will appear)
+    time.sleep(SLEEP_TIME)
+    driver.get(cred_url)
 
+    # click to install app
+    WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable(
+            (
+                By.XPATH,
+                (
+                    "//div[@class='Polaris-Layout']//div[@class='Polaris-LegacyStack__Item']"
+                    "//button[contains(@class, 'Polaris-Button') and @type='button']"
+                ),
+            )
+        )
+    ).click()
 
-def conn_gmail_imap() -> imaplib.IMAP4_SSL | None:
-    """
-    Connect to Gmail using IMAP.
-    :return: IMAP connection object
-    """
-    try:
-        email = os.getenv("EMAIL_TO_RECEIVE_KEYS")
-        password = os.getenv("EMAIL_RECEIVER_PASS")
+    # confirm app installation in modal
+    WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable(
+            (
+                By.XPATH,
+                (
+                    "//div[@class='Polaris-Modal-Dialog__Modal']//div[@class='Polaris-InlineStack']"
+                    "//button[contains(@class, 'Polaris-Button') and @type='button'][2]"
+                ),
+            )
+        )
+    ).click()
 
-        imap = imaplib.IMAP4_SSL("imap.gmail.com")
-        imap.login(email, password)
-        imap.select("inbox")
-        return imap
-    except imaplib.IMAP4.error as e:
-        # TODO: CHANGE TO LOGGER
-        print(f"IMAP error: {e}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    # wait app installation
+    time.sleep(SLEEP_TIME)
+
+    api_key_section_xpath = (
+        "//div[@class='Polaris-Layout']//div[@class='Polaris-LegacyStack__Item']"
+        "//div[@class='Polaris-Connected']"
+    )
+
+    # reveal API key
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (
+                By.XPATH,
+                f"{api_key_section_xpath}//button[contains(@class, 'Polaris-Button') and @type='button']",
+            )
+        )
+    ).click()
+
+    time.sleep(SHORT_SLEEP_TIME)
+
+    # get the API key
+    api_key = (
+        WebDriverWait(driver, 10)
+        .until(
+            EC.presence_of_element_located(
+                (
+                    By.XPATH,
+                    f"{api_key_section_xpath}//input[contains(@class, 'Polaris-TextField__Input')]",
+                )
+            )
+        )
+        .get_attribute("value")
+    )
+
+    if not api_key:
+        print("Failed to retrieve the API key.")
+        driver.quit()
+        return ""
+
+    driver.quit()
+    driver.switch_to.window(old_handler)
+
+    return api_key
