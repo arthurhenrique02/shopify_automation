@@ -1,3 +1,6 @@
+import imaplib
+import os
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,3 +21,23 @@ def login(driver: WebDriver, username: str, password: str):
     ).send_keys(password)
 
     find_submit_button(driver=driver).click()
+
+
+def conn_gmail_imap() -> imaplib.IMAP4_SSL | None:
+    """
+    Connect to Gmail using IMAP.
+    :return: IMAP connection object
+    """
+    try:
+        email = os.getenv("EMAIL_TO_RECEIVE_KEYS")
+        password = os.getenv("EMAIL_RECEIVER_PASS")
+
+        imap = imaplib.IMAP4_SSL("imap.gmail.com")
+        imap.login(email, password)
+        imap.select("inbox")
+        return imap
+    except imaplib.IMAP4.error as e:
+        # TODO: CHANGE TO LOGGER
+        print(f"IMAP error: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
