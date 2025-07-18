@@ -12,7 +12,6 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
-from services.automation.auth import conn_gmail_imap
 from services.automation.navigation import (
     open_create_app_page,
     open_theme_access_download_page,
@@ -146,12 +145,14 @@ def create_theme_access_password(driver: WebDriver) -> str:
     return True
 
 
-def get_theme_access_password_from_email(driver: WebDriver, store_name: str) -> str:
+def get_theme_access_password_from_email(driver: WebDriver, store_url: str) -> str:
     """
     Get the theme access password from the email.
     :param driver: Selenium WebDriver instance
     :return: Theme access password as a string
     """
+
+    from services.automation.auth import conn_gmail_imap
 
     # wait for the email to arrive
     time.sleep(15)
@@ -167,7 +168,7 @@ def get_theme_access_password_from_email(driver: WebDriver, store_name: str) -> 
             # Search for the email with the theme access password
             status, messages = imap.search(
                 None,
-                f'SUBJECT "{store_name}"',
+                f'SUBJECT "{store_url}"',
             )
 
             if status != "OK":
@@ -467,7 +468,7 @@ def get_custom_app_api_key(driver: WebDriver) -> str:
         driver.quit()
         return ""
 
-    driver.quit()
+    driver.close()
     driver.switch_to.window(old_handler)
 
     return api_key
