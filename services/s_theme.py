@@ -1,41 +1,45 @@
-import os
 import subprocess
+import typing
 
 
-def upload_shopify_theme(zip_path: str, store_url: str = os.getenv("SHOP_NAME")):
-    # with tempfile.TemporaryDirectory(suffix="_shopify_theme") as temp_dir:
-    #     with zipfile.ZipFile(zip_path, "r") as zip_ref:
-    #         zip_ref.extractall(temp_dir)
-
-    #     theme_folders = [
-    #         f for f in os.listdir(temp_dir) if os.path.isdir(os.path.join(temp_dir, f))
-    #     ]
-    #     if not temp_dir or not theme_folders:
-    #         raise Exception("No theme folder found in zip.")
-    #     print(temp_dir, theme_folders)
-
-    #     print("======================")
-    #     print(os.listdir(temp_dir))
-    #     print("======================")
-    #     subprocess.run(["cmd", "/c", "dir", temp_dir])  # Windows equivalent of 'ls -la'
+def upload_shopify_theme(folder_path: str, store_url: str, password: str):
     try:
-        result = subprocess.run(
+        subprocess.Popen(
             [
                 "C:/Users/arthu/AppData/Roaming/npm/shopify.cmd",
                 "theme",
                 "push",
                 "--path",
-                str(zip_path),
+                str(folder_path),
                 "--store",
                 store_url,
                 "--publish",
-                "--allow-live",
                 "--json",
+                "--allow-live",
+                "--force",
+                "--ignore",
+                "none",
+                "--password",
+                f"{password}",
+                "--theme",
+                "Dawn",
             ],
-            check=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+            universal_newlines=True,
         )
-        print(result.stdout.decode("utf-8"))
-        print("passei")
     except subprocess.CalledProcessError as e:
         print(e)
+
+
+# TODO CHANGE COLLECTION LIST DATA
+def change_collection_data(collections: typing.List[dict]):
+    """
+        CHANGE THESE LINES IN SETTINGS_DATA.JSON
+    "collection_list_AHQMEf":{"type":"collection-list","blocks":{"featured_collection_GJWefx":{"type":"featured_collection","settings":{"collection":""}},"featured_collection_KLhC6x":{"type":"featured_collection","settings":{"collection":""}},"featured_collection_LnT4kD":{"type":"featured_collection","settings":{"collection":""}},"featured_collection_jxHkzt":{"type":"featured_collection","settings":{"collection":""}}},"block_order":["featured_collection_GJWefx","featured_collection_KLhC6x","featured_collection_LnT4kD","featured_collection_jxHkzt"],"name":"Collection list","settings":{"layout":"container","title":"Lista de colecciones","grid":4}}}
+    """
+    ...

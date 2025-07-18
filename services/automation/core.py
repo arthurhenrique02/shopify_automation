@@ -1,4 +1,5 @@
 import os
+import pathlib
 
 from dotenv import load_dotenv
 
@@ -13,6 +14,7 @@ from services.automation.utils import (
     get_theme_access_password_from_email,
     initialize_driver,
 )
+from services.s_theme import upload_shopify_theme
 
 load_dotenv()
 
@@ -22,11 +24,13 @@ def automation_main():
 
     go_to_shopify_login_page(driver)
 
-    login(driver, username=os.getenv("username"), password=os.getenv("password"))
+    login(driver, username=os.getenv("s_username"), password=os.getenv("password"))
 
     success, old_handler = download_theme_access(driver)
 
-    store_name = driver.current_url.replace("https://", "").split("/")[2]
+    store_url = (
+        f"{driver.current_url.replace('https://', '').split('/')[2]}.myshopify.com"
+    )
 
     if not success:
         print(
@@ -44,7 +48,7 @@ def automation_main():
         driver.quit()
         return
 
-    theme_access_password = get_theme_access_password_from_email(driver, store_name)
+    theme_access_password = get_theme_access_password_from_email(driver, store_url)
 
     if not theme_access_password:
         print(
@@ -64,6 +68,17 @@ def automation_main():
         )
         driver.quit()
         return
+
+    # TODO GET THEME DINAMICALLY
+    upload_shopify_theme(
+        zip_path=(
+            pathlib.Path(__file__).parent.parent.parent
+            / "assets"
+            / "Tema_Vitrine_Latam"
+        ),
+        store_url=f"https://{store_url}",
+        password=theme_access_password,
+    )
 
     # keep browser alive
     input("Press Enter to close the browser...")
