@@ -4,7 +4,7 @@ import pathlib
 import time
 
 from services.automation.core import automation_main
-from services.graphql.graphql import graphql_request
+from services.graphql.admin_api import graphql_request
 from services.graphql.queries import (
     CREATE_PRODUCT_MEDIA_QUERY,
     CREATE_PRODUCT_QUERY,
@@ -141,12 +141,7 @@ def run_automation():
 
 
 if __name__ == "__main__":
-    # run_automation()
-    from services.automation.utils import (
-        conn_gmail_imap,
-    )
-
-    conn_gmail_imap()
+    run_automation()
 
 
 # path to create api token

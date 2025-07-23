@@ -1,4 +1,4 @@
-from services.graphql.graphql import graphql_request
+from services.graphql.admin_api import graphql_request
 from services.graphql.queries import (
     ADD_PRODUCT_COLLECTION_QUERY,
     CREATE_COLLECTION_QUERY,
