@@ -16,9 +16,9 @@ BASE_URL = "https://{SHOP_NAME}/admin/api/{API_VERSION}"
 
 
 def graphql_request(
-    shop_name: str, access_token: str, query: str, variables: dict | None = None
+    store_url: str, access_token: str, query: str, variables: dict | None = None
 ):
-    if not shop_name or not access_token:
+    if not store_url or not access_token:
         raise ValueError("Shop name and access token must be provided.")
 
     HEADERS["X-Shopify-Access-Token"] = access_token
@@ -28,7 +28,7 @@ def graphql_request(
         payload["variables"] = variables
 
     response = httpx.post(
-        f"{BASE_URL}/graphql.json".format(SHOP_NAME=shop_name, API_VERSION=API_VERSION),
+        f"{BASE_URL}/graphql.json".format(SHOP_NAME=store_url, API_VERSION=API_VERSION),
         headers=HEADERS,
         json=payload,
     )
