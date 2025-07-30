@@ -8,9 +8,10 @@ CREATE_COLLECTION_QUERY = (
 )
 
 PUBLISH_COLLECTION_QUERY = (
-    "mutation collectionPublish($collectionId: ID!) {"
-    "  collectionPublish(collectionId: $collectionId) {"
+    "mutation collectionPublish($input: CollectionPublishInput!) {"
+    "  collectionPublish(input: $input) {"
     "    collection { id title }"
+    "    collectionPublications { publication { id } }"
     "    userErrors { field message }"
     "  }"
     "}"
@@ -49,6 +50,15 @@ ADD_PRODUCT_COLLECTION_QUERY = (
     "mutation collectionAddProducts($collectionId: ID!, $productIds: [ID!]!) {"
     "  collectionAddProducts(collectionId: $collectionId, productIds: $productIds) {"
     "    collection { title }"
+    "    userErrors { field message }"
+    "  }"
+    "}"
+)
+
+PUBLISH_PRODUCT_QUERY = (
+    "mutation productPublish($productId: ID!, $publicationId: ID!) {"
+    "  productPublish(productId: $productId, publicationId: $publicationId) {"
+    "    product { id title }"
     "    userErrors { field message }"
     "  }"
     "}"
