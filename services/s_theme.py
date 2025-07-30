@@ -1,11 +1,8 @@
 import json
 import os
 import subprocess
-import typing
 
 from dotenv import load_dotenv
-
-from services.graphql.admin_api import get_settings_data_content
 
 load_dotenv()
 
@@ -59,15 +56,18 @@ def upload_shopify_theme(
     """
     Uploads a Shopify theme to the specified store.
     Args:
+        theme_id (str): The ID of the theme to upload.
         folder_path (str): The path to the theme folder.
         store_url (str): The URL of the Shopify store.
         password (str): The Theme access token.
+    Returns:
+        bool: True if the upload was successful, False otherwise.
     """
-    try:
-        if not theme_id:
-            print("Theme ID could not be retrieved. Exiting upload process.")
-            return False
+    if not theme_id or not folder_path or not store_url or not password:
+        print("Missing required parameters for uploading theme.")
+        return False
 
+    try:
         subprocess.run(
             [
                 f"{os.getenv('SHOPIFY_CLI_PATH')}",
@@ -93,31 +93,7 @@ def upload_shopify_theme(
             input="\n",
         )
     except subprocess.CalledProcessError as e:
-        print("passo no erro")
         print(e)
         return False
 
     return True
-
-
-# TODO CHANGE COLLECTION LIST DATA
-def change_collection_data(
-    theme_id: str, store_name: str, password: str, collections: typing.List[dict]
-) -> bool:
-    """
-    Get settings_data from the theme and update the collection data part
-    Args:
-        theme_id (str): The ID of the theme.
-        store_name (str): The name of the Shopify store.
-        password (str): The Theme access token.
-        collections (typing.List[dict]): The list of collections to update.
-
-    Returns:
-
-    """
-
-    settings_data_content = get_settings_data_content(
-        shop_name=store_name, access_token=password, theme_id=theme_id
-    )
-
-    print("settings_data_content", settings_data_content)
