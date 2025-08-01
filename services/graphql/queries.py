@@ -37,10 +37,10 @@ CREATE_PRODUCT_MEDIA_QUERY = (
     "}"
 )
 
-CREATE_VARIANT_QUERY = (
-    "mutation productVariantCreate($productId: ID!, $variant: ProductVariantInput!) {"
-    "  productVariantCreate(productId: $productId, variant: $variant) {"
-    "    productVariant { id title }"
+BULK_CREATE_VARIANTS_QUERY = (
+    "mutation ProductVariantsCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {"
+    "  productVariantsBulkCreate(productId: $productId, variants: $variants) {"
+    "    productVariants { id title selectedOptions { name value } }"
     "    userErrors { field message }"
     "  }"
     "}"
