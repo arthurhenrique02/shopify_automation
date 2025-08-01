@@ -1,79 +1,46 @@
-import csv
+import pandas as pd
+from pandas.core.series import Series
 
 from services.graphql.admin_api import graphql_request
 from services.graphql.queries import (
     CREATE_PRODUCT_MEDIA_QUERY,
     CREATE_PRODUCT_QUERY,
-    CREATE_VARIANT_QUERY,
     PUBLISH_PRODUCT_QUERY,
 )
 
 
-def upload_product(row):
-    title = row["Title"]
-    body_html = row["Body (HTML)"]
-    vendor = row["Vendor"]
-    product_type = row["Type"]
-    tags = row["Tags"].split(",") if row["Tags"] else []
+def upload_product(store_url: str, access_token: str, row: Series) -> dict:
     options = []
-
-    # Handle options (like Cor, Tamanho)
-    if row["Option1 Name"]:
-        options.append(
-            {"name": row["Option1 Name"], "values": {"name": row["Option1 Value"]}}
-        )
-    if row["Option2 Name"]:
-        options.append(
-            {"name": row["Option2 Name"], "values": {"name": row["Option2 Value"]}}
-        )
-    if row["Option3 Name"]:
-        options.append(
-            {"name": row["Option3 Name"], "values": {"name": row["Option3 Value"]}}
-        )
-
-    # Prepare variant
-    variant = {
-        "sku": row["Variant SKU"],
-        "price": row["Variant Price"],
-        "requiresShipping": row["Variant Requires Shipping"].lower() == "true",
-        "taxable": row["Variant Taxable"].lower() == "true",
-        "inventoryManagement": row["Variant Inventory Tracker"] or None,
-        "inventoryPolicy": row["Variant Inventory Policy"] or "continue",
-        "fulfillmentService": row["Variant Fulfillment Service"] or "manual",
-        "weight": float(row["Variant Grams"] or 0) / 1000.0,
-        "weightUnit": row["Variant Weight Unit"] or "kg",
-    }
+    for i in range(1, 4):
+        option_name = row.get(f"Option{i} Name", "")
+        option_value = row.get(f"Option{i} Value", "")
+        if option_name and all(option_value):
+            options.append(
+                {"name": option_name, "values": [{"name": v} for v in option_value]}
+            )
 
     # Build product input for GraphQL
     product_input = {
-        "title": title,
-        "descriptionHtml": body_html,
-        "vendor": vendor,
-        "productType": product_type,
-        "tags": tags,
+        "title": row["Title"],
+        "descriptionHtml": row["Body (HTML)"],
+        "vendor": row["Vendor"],
+        "productType": row["Type"],
+        "tags": [tag.strip() for tag in row.get("Tags", []) if tag.strip()],
         "productOptions": options,
     }
-    product_media = []
 
-    # Add image
-    if row["Image Src"]:
-        product_media.append(
-            {"originalSource": row["Image Src"], "mediaContentType": "IMAGE"}
-        )
-
-        # Variant image
-        # TODO ADD VARIANT IMAGE IN PRODUCT VARIANT
-        if row["Variant Image"]:
-            product_media.append(
-                {
-                    "originalSource": row["Variant Image"],
-                    "mediaContentType": "IMAGE",
-                }
-            )
+    product_media = [
+        {
+            "originalSource": img,
+            "mediaContentType": "IMAGE",
+        }
+        for img in [*row["Image Src"], *row["Variant Image"]]
+        if img
+    ]
 
     # GraphQL mutation
     query = CREATE_PRODUCT_QUERY
-    result = graphql_request(query, {"product": product_input})
+    result = graphql_request(store_url, access_token, query, {"product": product_input})
 
     # === create media ===
     media_query = CREATE_PRODUCT_MEDIA_QUERY
@@ -81,6 +48,8 @@ def upload_product(row):
 
     if product_media:
         result_media = graphql_request(
+            store_url,
+            access_token,
             media_query,
             {
                 "media": product_media,
@@ -88,27 +57,91 @@ def upload_product(row):
             },
         )
 
-    # ==== create variant ====
-    variant_query = CREATE_VARIANT_QUERY
-
-    variant_result = graphql_request(
-        variant_query,
-        {
-            "productId": product_id,
-            "variant": [variant],
-        },
-    )
+        if errors := result_media.get("errors"):
+            # print all messages from errors list
+            print(
+                "Error creating product media:",
+                ". ".join([e.get("message", []) for e in errors]),
+            )
 
     return result["data"]["productCreate"]
 
 
-def upload_products_from_csv(csv_file):
+def upload_products_from_csv(
+    store_url: str, access_token: str, csv_file_path: str
+) -> list[str]:
     products = []
-    with open(csv_file, encoding="utf-8") as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            product = upload_product(row)
-            products.append(product)
+
+    df = pd.read_csv(csv_file_path).fillna(value="")
+
+    try:
+        grouped_df = (
+            df.groupby("Handle")
+            .aggregate(
+                {
+                    "Title": "first",
+                    "Body (HTML)": "first",
+                    "Vendor": "first",
+                    "Type": "first",
+                    "Tags": list,
+                    "Option1 Name": "first",
+                    "Option1 Value": lambda x: x.unique().tolist(),
+                    "Option2 Name": "first",
+                    "Option2 Value": lambda x: x.unique().tolist(),
+                    "Option3 Name": "first",
+                    "Option3 Value": lambda x: x.unique().tolist(),
+                    "Variant SKU": lambda x: x.unique().tolist(),
+                    "Variant Price": list,
+                    "Variant Requires Shipping": list,
+                    "Variant Taxable": list,
+                    "Variant Inventory Tracker": list,
+                    "Variant Inventory Policy": list,
+                    "Variant Fulfillment Service": list,
+                    "Variant Grams": list,
+                    "Variant Weight Unit": list,
+                    "Image Src": list,
+                    "Variant Image": list,
+                }
+            )
+            .reset_index()
+        )
+
+    except KeyError:
+        grouped_df = (
+            df.groupby("Title")
+            .aggregate(
+                {
+                    "Body (HTML)": "first",
+                    "Vendor": "first",
+                    "Type": "first",
+                    "Tags": list,
+                    "Option1 Name": "first",
+                    "Option1 Value": lambda x: x.unique().tolist(),
+                    "Option2 Name": "first",
+                    "Option2 Value": lambda x: x.unique().tolist(),
+                    "Option3 Name": "first",
+                    "Option3 Value": lambda x: x.unique().tolist(),
+                    # get unique skus
+                    "Variant SKU": lambda x: x.unique().tolist(),
+                    "Variant Price": list,
+                    "Variant Requires Shipping": list,
+                    "Variant Taxable": list,
+                    "Variant Inventory Tracker": list,
+                    "Variant Inventory Policy": list,
+                    "Variant Fulfillment Service": list,
+                    "Variant Grams": list,
+                    "Variant Weight Unit": list,
+                    "Image Src": list,
+                    "Variant Image": list,
+                }
+            )
+            .reset_index()
+        )
+
+    for _, row in grouped_df.iterrows():
+        print(f"Uploading product: {row['Title']}")
+        product = upload_product(store_url, access_token, row)
+        products.append(product["product"]["id"])
 
     return products
 
@@ -153,5 +186,6 @@ def publish_products(
         published_product_id = publish_product(
             store_url, access_token, product_id, publication_id
         )
+        print(f"Product {product_id} published with ID: {published_product_id}")
         published_product_ids.append(published_product_id)
     return published_product_ids
