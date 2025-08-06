@@ -1,3 +1,5 @@
+import httpx
+
 from services.graphql.admin_api import graphql_request
 from services.graphql.queries import (
     ADD_PRODUCT_COLLECTION_QUERY,
@@ -6,7 +8,9 @@ from services.graphql.queries import (
 )
 
 
-def create_collection(store_url: str, access_token: str, title: str) -> str:
+def create_collection(
+    client: httpx.Client, store_url: str, access_token: str, title: str
+) -> str:
     """
     Creates a collection in the Shopify store.
     Args:
@@ -20,15 +24,24 @@ def create_collection(store_url: str, access_token: str, title: str) -> str:
         raise ValueError("Shop URL, access token, and title must be provided.")
 
     data = graphql_request(
-        store_url, access_token, CREATE_COLLECTION_QUERY, {"input": {"title": title}}
+        client,
+        store_url,
+        access_token,
+        CREATE_COLLECTION_QUERY,
+        {"input": {"title": title}},
     )
     return data["data"]["collectionCreate"]["collection"]["id"]
 
 
 def publish_collection(
-    store_url: str, access_token: str, collection_id: str, publication_id: str
+    client: httpx.Client,
+    store_url: str,
+    access_token: str,
+    collection_id: str,
+    publication_id: str,
 ):
     data = graphql_request(
+        client,
         store_url,
         access_token,
         PUBLISH_COLLECTION_QUERY,
@@ -43,9 +56,10 @@ def publish_collection(
 
 
 def add_product_to_collection(
-    store_url: str, access_token: str, product_id, collection_id
+    client: httpx.Client, store_url: str, access_token: str, product_id, collection_id
 ):
     graphql_request(
+        client,
         store_url,
         access_token,
         ADD_PRODUCT_COLLECTION_QUERY,
@@ -66,20 +80,22 @@ def upload_collections(
         list[str]: A list of collection IDs that were successfully created.
     """
     collections_id = []
-    for collection in collections:
-        title = collection.get("name")
-        if not title:
-            print("Collection title is required.")
-            continue
 
-        collection_id = create_collection(store_url, access_token, title)
+    with httpx.Client() as client:
+        for collection in collections:
+            title = collection.get("name")
+            if not title:
+                print("Collection title is required.")
+                continue
 
-        if not collection_id:
-            print(f"Failed to create collection '{title}'.")
-            continue
+            collection_id = create_collection(client, store_url, access_token, title)
 
-        collections_id.append(collection_id)
-        print(f"Collection '{title}' created with ID: {collection_id}")
+            if not collection_id:
+                print(f"Failed to create collection '{title}'.")
+                continue
+
+            collections_id.append(collection_id)
+            print(f"Collection '{title}' created with ID: {collection_id}")
 
     return collections_id
 

@@ -2,6 +2,7 @@ import os
 
 import httpx
 from dotenv import load_dotenv
+from httpx import Client
 
 load_dotenv()
 
@@ -16,7 +17,11 @@ BASE_URL = "https://{SHOP_NAME}/admin/api/{API_VERSION}"
 
 
 def graphql_request(
-    store_url: str, access_token: str, query: str, variables: dict | None = None
+    client: Client,
+    store_url: str,
+    access_token: str,
+    query: str,
+    variables: dict | None = None,
 ):
     if not store_url or not access_token:
         raise ValueError("Shop name and access token must be provided.")
@@ -27,10 +32,11 @@ def graphql_request(
     if variables:
         payload["variables"] = variables
 
-    response = httpx.post(
+    response = client.post(
         f"{BASE_URL}/graphql.json".format(SHOP_NAME=store_url, API_VERSION=API_VERSION),
         headers=HEADERS,
         json=payload,
+        timeout=None,
     )
     response.raise_for_status()
     return response.json()
