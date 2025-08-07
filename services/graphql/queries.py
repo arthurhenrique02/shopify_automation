@@ -19,9 +19,16 @@ PUBLISH_COLLECTION_QUERY = (
 
 # === PRODUCT QUERIES ===
 CREATE_PRODUCT_QUERY = (
-    "mutation productCreate($product: ProductCreateInput!) {"
-    "    productCreate(product: $product) {"
-    "        product { id title }"
+    "mutation productCreate($product: ProductCreateInput!, $media: [CreateMediaInput!]) {"
+    "    productCreate(product: $product, media: $media) {"
+    "        product { "
+    "           id "
+    "           title"
+    "           description"
+    "           media(first: 10) { nodes { alt mediaContentType status } } "
+    "           options { id name position optionValues { id name hasVariants } }"
+    "           variants(first: 250) { edges { node { id title price sku } } }"
+    "        }"
     "        userErrors { field message }"
     "    }"
     "}"

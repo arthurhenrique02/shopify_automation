@@ -1,19 +1,22 @@
+import httpx
 import pandas as pd
 from pandas.core.series import Series
 
 from services.graphql.admin_api import graphql_request
 from services.graphql.queries import (
-    CREATE_PRODUCT_MEDIA_QUERY,
     CREATE_PRODUCT_QUERY,
     PUBLISH_PRODUCT_QUERY,
 )
 
 
-def upload_product(store_url: str, access_token: str, row: Series) -> dict:
+def upload_product(
+    client: httpx.Client, store_url: str, access_token: str, row: Series
+) -> dict:
     options = []
     for i in range(1, 4):
         option_name = row.get(f"Option{i} Name", "")
         option_value = row.get(f"Option{i} Value", "")
+        # TODO FIND WHY JUST ONE OPTION IS BEING UPLOADED
         if option_name and all(option_value):
             options.append(
                 {"name": option_name, "values": [{"name": v} for v in option_value]}
@@ -29,7 +32,7 @@ def upload_product(store_url: str, access_token: str, row: Series) -> dict:
         "productOptions": options,
     }
 
-    product_media = [
+    medias = [
         {
             "originalSource": img,
             "mediaContentType": "IMAGE",
@@ -39,30 +42,13 @@ def upload_product(store_url: str, access_token: str, row: Series) -> dict:
     ]
 
     # GraphQL mutation
-    query = CREATE_PRODUCT_QUERY
-    result = graphql_request(store_url, access_token, query, {"product": product_input})
-
-    # === create media ===
-    media_query = CREATE_PRODUCT_MEDIA_QUERY
-    product_id = result["data"]["productCreate"]["product"]["id"]
-
-    if product_media:
-        result_media = graphql_request(
-            store_url,
-            access_token,
-            media_query,
-            {
-                "media": product_media,
-                "productId": product_id,
-            },
-        )
-
-        if errors := result_media.get("errors"):
-            # print all messages from errors list
-            print(
-                "Error creating product media:",
-                ". ".join([e.get("message", []) for e in errors]),
-            )
+    result = graphql_request(
+        client,
+        store_url,
+        access_token,
+        CREATE_PRODUCT_QUERY,
+        {"product": product_input, "media": medias},
+    )
 
     return result["data"]["productCreate"]
 
@@ -121,7 +107,6 @@ def upload_products_from_csv(
                     "Option2 Value": lambda x: x.unique().tolist(),
                     "Option3 Name": "first",
                     "Option3 Value": lambda x: x.unique().tolist(),
-                    # get unique skus
                     "Variant SKU": lambda x: x.unique().tolist(),
                     "Variant Price": list,
                     "Variant Requires Shipping": list,
@@ -138,16 +123,23 @@ def upload_products_from_csv(
             .reset_index()
         )
 
-    for _, row in grouped_df.iterrows():
-        print(f"Uploading product: {row['Title']}")
-        product = upload_product(store_url, access_token, row)
-        products.append(product["product"]["id"])
+    counter = 0
+    with httpx.Client() as client:
+        for _, row in grouped_df.iterrows():
+            counter += 1
+            print(f"Uploading product {counter}: {row['Title']}")
+            product = upload_product(client, store_url, access_token, row)
+            products.append(product["product"]["id"])
 
     return products
 
 
 def publish_product(
-    store_url: str, access_token: str, product_id: str, publication_id: str
+    client: httpx.Client,
+    store_url: str,
+    access_token: str,
+    product_id: str,
+    publication_id: str,
 ):
     """
     Publishes a product to the specified publication.
@@ -160,6 +152,7 @@ def publish_product(
         str: The ID of the published product.
     """
     data = graphql_request(
+        client,
         store_url,
         access_token,
         PUBLISH_PRODUCT_QUERY,
