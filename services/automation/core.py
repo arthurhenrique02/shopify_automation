@@ -1,5 +1,6 @@
-import os
+import json
 import pathlib
+import typing
 
 from dotenv import load_dotenv
 
@@ -22,12 +23,34 @@ from services.s_theme import get_theme_id, upload_shopify_theme
 load_dotenv()
 
 
-def automation_main():
+def automation_main(
+    country: typing.Literal["es", "it"], username: str = None, password: str = None
+):
+    if country not in ["es", "it"]:
+        raise ValueError("Country must be either 'es' (Spain) or 'it' (Italy).")
+
+    if not username or not password:
+        raise ValueError("Username and password must be provided.")
+
+    # get items from corresponding country
+    assets_folder_path = pathlib.Path(__file__).parent.parent.parent / "assets"
+    match country:
+        case "es":
+            csv_file_path = assets_folder_path / "100_spanish_products.csv"
+            theme_folder = assets_folder_path / "Tema_Espanha"
+            with open(assets_folder_path / "spanish_collections.json", "r") as file:
+                collections = json.load(file)
+        case "it":
+            csv_file_path = assets_folder_path / "italian_products.csv"
+            theme_folder = assets_folder_path / "Tema_Italia"
+            with open(assets_folder_path / "italian_collections.json", "r") as file:
+                collections = json.load(file)
+
     driver = initialize_driver()
 
     go_to_shopify_login_page(driver)
 
-    login(driver, username=os.getenv("s_username"), password=os.getenv("password"))
+    login(driver, username=username, password=password)
 
     success, old_handler = download_theme_access(driver)
 
@@ -103,12 +126,7 @@ def automation_main():
     collections_id = upload_collections(
         store_url=store_url,
         access_token=custom_app_api_key,
-        # TODO GET DINAMICALLY
-        collections=[
-            {"name": "Best Products"},
-            {"name": "New Arrivals"},
-            {"name": "Sale Items"},
-        ],
+        collections=collections,
     )
 
     publish_collections(
@@ -120,9 +138,9 @@ def automation_main():
 
     # === PRODUCTS ===
     products_id = upload_products_from_csv(
-        csv_file=pathlib.Path(__file__).parent.parent
-        / "assets"
-        / "100_spanish_products.csv"
+        store_url,
+        custom_app_api_key,
+        csv_file_path=csv_file_path,
     )
 
     publish_products(
@@ -134,9 +152,7 @@ def automation_main():
 
     upload_shopify_theme(
         theme_id=theme_id,
-        folder_path=(
-            pathlib.Path(__file__).parent.parent.parent / "assets" / "Tema_Espanha"
-        ),
+        folder_path=theme_folder,
         store_name=store_url,
         password=custom_app_api_key,
     )
