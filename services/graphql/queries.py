@@ -19,15 +19,15 @@ PUBLISH_COLLECTION_QUERY = (
 
 # === PRODUCT QUERIES ===
 CREATE_PRODUCT_QUERY = (
-    "mutation productCreate($product: ProductCreateInput!, $media: [CreateMediaInput!]) {"
+    "mutation customProductCreate($product: ProductCreateInput!, $media: [CreateMediaInput!]) {"
     "    productCreate(product: $product, media: $media) {"
     "        product { "
     "           id "
     "           title"
     "           description"
-    "           media(first: 10) { nodes { alt mediaContentType status } } "
     "           options { id name position optionValues { id name hasVariants } }"
-    "           variants(first: 250) { edges { node { id title price sku } } }"
+    "           variants(first: 250) { nodes { id title selectedOptions { name value } } }"
+    "           media(first: 10) { nodes { alt mediaContentType status } } "
     "        }"
     "        userErrors { field message }"
     "    }"
@@ -45,10 +45,11 @@ CREATE_PRODUCT_MEDIA_QUERY = (
 )
 
 BULK_CREATE_VARIANTS_QUERY = (
-    "mutation ProductVariantsCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {"
+    "mutation productVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {"
     "  productVariantsBulkCreate(productId: $productId, variants: $variants) {"
-    "    productVariants { id title selectedOptions { name value } }"
     "    userErrors { field message }"
+    "    product { id title options { id name position optionValues { id name hasVariants } } }"
+    "    productVariants { id title selectedOptions { name value } }"
     "  }"
     "}"
 )

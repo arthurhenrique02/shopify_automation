@@ -1,9 +1,12 @@
+from itertools import product
+
 import httpx
 import pandas as pd
 from pandas.core.series import Series
 
 from services.graphql.admin_api import graphql_request
-from services.graphql.queries import (
+from services.graphql.queries import (  # NOQA: F401
+    BULK_CREATE_VARIANTS_QUERY,
     CREATE_PRODUCT_QUERY,
     PUBLISH_PRODUCT_QUERY,
 )
@@ -13,14 +16,19 @@ def upload_product(
     client: httpx.Client, store_url: str, access_token: str, row: Series
 ) -> dict:
     options = []
+    pos = 1
     for i in range(1, 4):
         option_name = row.get(f"Option{i} Name", "")
         option_value = row.get(f"Option{i} Value", "")
-        # TODO FIND WHY JUST ONE OPTION IS BEING UPLOADED
         if option_name and all(option_value):
             options.append(
-                {"name": option_name, "values": [{"name": v} for v in option_value]}
+                {
+                    "name": option_name,
+                    "position": pos,
+                    "values": [{"name": v} for v in option_value],
+                }
             )
+            pos += 1
 
     # Build product input for GraphQL
     product_input = {
@@ -49,6 +57,33 @@ def upload_product(
         CREATE_PRODUCT_QUERY,
         {"product": product_input, "media": medias},
     )
+
+    if len(options) > 1:
+        p_id = result["data"]["productCreate"]["product"]["id"]
+        graphql_request(
+            client,
+            store_url,
+            access_token,
+            BULK_CREATE_VARIANTS_QUERY,
+            {
+                "productId": p_id,
+                "variants": [
+                    {"optionValues": [*combination]}
+                    for i, combination in enumerate(
+                        product(
+                            *[
+                                [
+                                    {"optionName": opt["name"], **val}
+                                    for val in opt["values"]
+                                ]
+                                for opt in options
+                            ],
+                        )
+                    )
+                    if i > 0
+                ],
+            },
+        )
 
     return result["data"]["productCreate"]
 
