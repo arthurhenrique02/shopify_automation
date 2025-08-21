@@ -1,7 +1,10 @@
 import os
 
 import httpx
+import instructor
 from dotenv import load_dotenv
+
+from models.user import TrelloUserData
 
 load_dotenv()
 
@@ -43,15 +46,26 @@ def get_card_description(card: dict) -> str:
     return card.get("desc", "")
 
 
-if __name__ == "__main__":
-    lists = get_board_lists(os.getenv("TRELLO_BOARD_ID"))
-    new_items_list = next(
-        filter(lambda x: "NOVA SOLICITAÇÃO" in x["name"], lists), None
+def get_user_info_from_description(description: str) -> TrelloUserData:
+    """
+    Extracts user information from the card description using the Instructor AI model.
+    """
+    client = instructor.from_provider("ollama/qwen3:0.6b", mode=instructor.Mode.JSON)
+    response = client.chat.completions.create(
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    f"You're a text scrapper and received some text to extract infomration. "
+                    "Follow the insctructions below:\n"
+                    "1. Extract the name, email, password, country, phone, store name, and colors from the text.\n"
+                    "2. The country should be one option ('non' if country not in the list).\n"
+                    "3. Transform color data into hexadecimal string. (Example: white: #ffffff, black: #000000, etc)\n"
+                    f"The text is: {description}"
+                ),
+            },
+        ],
+        response_model=TrelloUserData,
+        max_retries=2,
     )
-
-    if not new_items_list:
-        raise ValueError("List not found")
-
-    cards = get_cards_from_list(new_items_list["id"])
-
-    # TODO USE CARDS DATA INTO AUTOMATION CORE TO PROCESS
+    return response

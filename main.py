@@ -1,148 +1,41 @@
-import csv
-import json
-import pathlib
-import time
+import os
 
 from services.automation.core import automation_main
-from services.graphql.admin_api import graphql_request
-from services.graphql.queries import (
-    CREATE_PRODUCT_MEDIA_QUERY,
-    CREATE_PRODUCT_QUERY,
-    CREATE_VARIANT_QUERY,
+from services.trello.endpoints import (
+    get_board_lists,
+    get_card_description,
+    get_cards_from_list,
+    get_user_info_from_description,
 )
-from services.s_collections import add_product_to_collection, create_collection
-from services.s_theme import upload_shopify_theme
-
-
-def create_product_from_csv_row(row):
-    title = row["Title"]
-    body_html = row["Body (HTML)"]
-    vendor = row["Vendor"]
-    product_type = row["Type"]
-    tags = row["Tags"].split(",") if row["Tags"] else []
-    options = []
-
-    # Handle options (like Cor, Tamanho)
-    if row["Option1 Name"]:
-        options.append(
-            {"name": row["Option1 Name"], "values": {"name": row["Option1 Value"]}}
-        )
-    if row["Option2 Name"]:
-        options.append(
-            {"name": row["Option2 Name"], "values": {"name": row["Option2 Value"]}}
-        )
-    if row["Option3 Name"]:
-        options.append(
-            {"name": row["Option3 Name"], "values": {"name": row["Option3 Value"]}}
-        )
-
-    # Prepare variant
-    variant = {
-        "sku": row["Variant SKU"],
-        "price": row["Variant Price"],
-        "requiresShipping": row["Variant Requires Shipping"].lower() == "true",
-        "taxable": row["Variant Taxable"].lower() == "true",
-        "inventoryManagement": row["Variant Inventory Tracker"] or None,
-        "inventoryPolicy": row["Variant Inventory Policy"] or "continue",
-        "fulfillmentService": row["Variant Fulfillment Service"] or "manual",
-        "weight": float(row["Variant Grams"] or 0) / 1000.0,
-        "weightUnit": row["Variant Weight Unit"] or "kg",
-    }
-
-    # Build product input for GraphQL
-    product_input = {
-        "title": title,
-        "descriptionHtml": body_html,
-        "vendor": vendor,
-        "productType": product_type,
-        "tags": tags,
-        "productOptions": options,
-    }
-    product_media = []
-
-    # Add image
-    if row["Image Src"]:
-        product_media.append(
-            {"originalSource": row["Image Src"], "mediaContentType": "IMAGE"}
-        )
-
-        # Variant image
-        # TODO ADD VARIANT IMAGE IN PRODUCT VARIANT
-        if row["Variant Image"]:
-            product_media.append(
-                {
-                    "originalSource": row["Variant Image"],
-                    "mediaContentType": "IMAGE",
-                }
-            )
-
-    # GraphQL mutation
-    query = CREATE_PRODUCT_QUERY
-    result = graphql_request(query, {"product": product_input})
-
-    # === create media ===
-    media_query = CREATE_PRODUCT_MEDIA_QUERY
-    product_id = result["data"]["productCreate"]["product"]["id"]
-
-    if product_media:
-        result_media = graphql_request(
-            media_query,
-            {
-                "media": product_media,
-                "productId": product_id,
-            },
-        )
-
-    # ==== create variant ====
-    variant_query = CREATE_VARIANT_QUERY
-
-    variant_result = graphql_request(
-        variant_query,
-        {
-            "productId": product_id,
-            "variant": [variant],
-        },
-    )
-
-    return result["data"]["productCreate"]
 
 
 def main():
-    upload_shopify_theme(
-        (pathlib.Path(__file__).parent / "assets" / "Tema_Vitrine_Latam")
+    lists = get_board_lists(os.getenv("TRELLO_BOARD_ID"))
+    new_items_list = next(
+        filter(lambda x: "NOVA SOLICITAÇÃO" in x["name"], lists), None
     )
 
-    raise
+    if not new_items_list:
+        raise ValueError("List not found")
 
-    with open("collections.json", encoding="utf-8") as f:
-        collections = json.load(f)
-    collection_ids = {}
+    cards = get_cards_from_list(new_items_list["id"])
 
-    for name in collections:
-        collection_id = create_collection(name)
-        collection_ids[name] = collection_id
-        # wait rate limit
-        time.sleep(0.5)
+    for card in cards:
+        description = get_card_description(card)
+        if not description:
+            continue
 
-    with open("100_spanish_products.csv", newline="", encoding="utf-8") as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            product_id = create_product_from_csv_row(row)
-            time.sleep(0.5)
+        user_data = get_user_info_from_description(description)
 
-            best_collection_id = collection_ids.get("Best Products")
-            if best_collection_id:
-                add_product_to_collection(product_id, best_collection_id)
-                time.sleep(0.5)
-
-
-def run_automation():
-    automation_main()
+        automation_main(
+            country=user_data.country,
+            username=user_data.email,
+            password=user_data.password,
+        )
 
 
 if __name__ == "__main__":
-    run_automation()
-
+    main()
 
 # path to create api token
 #   div: AppFrameNav

@@ -26,7 +26,7 @@ load_dotenv()
 def automation_main(
     country: typing.Literal["es", "it"], username: str = None, password: str = None
 ):
-    if country not in ["es", "it"]:
+    if not country or country not in ["es", "it"]:
         raise ValueError("Country must be either 'es' (Spain) or 'it' (Italy).")
 
     if not username or not password:
