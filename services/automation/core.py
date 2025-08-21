@@ -3,8 +3,14 @@ import pathlib
 import typing
 
 from dotenv import load_dotenv
+from selenium.common import WebDriverException
 
 from services.automation.auth import login
+from services.automation.exceptions import (
+    GoogleVinculationException,
+    NonExistentAccountException,
+    TwoFactorAuthException,
+)
 from services.automation.navigation import (
     go_to_shopify_login_page,
 )
@@ -50,7 +56,26 @@ def automation_main(
 
     go_to_shopify_login_page(driver)
 
-    login(driver, username=username, password=password)
+    try:
+        login(driver, username=username, password=password)
+    except WebDriverException as e:
+        # TODO : CHANGE TO LOGGER
+        # TODO CHANGE CARD POSITION IN TRELLO
+        print(f"Login failed: {e}")
+        driver.quit()
+        return
+    except NonExistentAccountException:
+        print("The account does not exist. Needed to create a new account.")
+        driver.quit()
+        return
+    except GoogleVinculationException:
+        print("Google account linkage is required. Cannot proceed with automation.")
+        driver.quit()
+        return
+    except TwoFactorAuthException:
+        print("Two-factor authentication is required. Cannot proceed with automation.")
+        driver.quit()
+        return
 
     success, old_handler = download_theme_access(driver)
 
