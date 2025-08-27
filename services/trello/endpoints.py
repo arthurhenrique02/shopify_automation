@@ -69,3 +69,22 @@ def get_user_info_from_description(description: str) -> TrelloUserData:
         max_retries=2,
     )
     return response
+
+
+def move_card_to_list(card_id: str, list_id: str) -> None:
+    """
+    Moves a Trello card to a different list using the Trello API.
+    """
+    if not list_id:
+        print("List ID is None, cannot move card.")
+        return
+
+    url = f"https://api.trello.com/1/cards/{card_id}"
+    params = {
+        "key": os.getenv("TRELLO_API_KEY"),
+        "token": os.getenv("TRELLO_TOKEN"),
+        "idList": list_id,
+    }
+
+    response = httpx.put(url, params=params)
+    response.raise_for_status()

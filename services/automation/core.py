@@ -25,12 +25,17 @@ from services.graphql.admin_api import graphql_request
 from services.s_collections import publish_collections, upload_collections
 from services.s_products import publish_products, upload_products_from_csv
 from services.s_theme import get_theme_id, upload_shopify_theme
+from services.trello.endpoints import move_card_to_list
 
 load_dotenv()
 
 
 def automation_main(
-    country: typing.Literal["es", "it"], username: str = None, password: str = None
+    country: typing.Literal["es", "it"],
+    username: str,
+    password: str,
+    card_id: str,
+    trello_lists: typing.List,
 ):
     if not country or country not in ["es", "it"]:
         raise ValueError("Country must be either 'es' (Spain) or 'it' (Italy).")
@@ -66,14 +71,44 @@ def automation_main(
         return
     except NonExistentAccountException:
         print("The account does not exist. Needed to create a new account.")
+        move_card_to_list(
+            card_id=card_id,
+            list_id=next(
+                filter(
+                    lambda x: "EMAIL ERRADO" in x["name"],
+                    trello_lists,
+                ),
+                None,
+            )["id"],
+        )
         driver.quit()
         return
     except GoogleVinculationException:
         print("Google account linkage is required. Cannot proceed with automation.")
+        move_card_to_list(
+            card_id=card_id,
+            list_id=next(
+                filter(
+                    lambda x: "VINCULADA AO GOOGLE" in x["name"],
+                    trello_lists,
+                ),
+                None,
+            )["id"],
+        )
         driver.quit()
         return
     except TwoFactorAuthException:
         print("Two-factor authentication is required. Cannot proceed with automation.")
+        move_card_to_list(
+            card_id=card_id,
+            list_id=next(
+                filter(
+                    lambda x: "REMOVER AUTENTICAÇÃO DE DOIS FATORES" in x["name"],
+                    trello_lists,
+                ),
+                None,
+            )["id"],
+        )
         driver.quit()
         return
 

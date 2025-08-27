@@ -31,25 +31,10 @@ def main():
             country=user_data.country,
             username=user_data.email,
             password=user_data.password,
+            card_id=card["id"],
+            trello_lists=lists,
         )
 
 
 if __name__ == "__main__":
     main()
-
-# path to create api token
-#   div: AppFrameNav
-#   btn: class="_Button_1g3wt_32" span:text="Apps"
-#   div: class="_SearchResultSection_izb45_1 _FooterSection_izb45_26"
-#   ul: search-results
-#   li: app-search-result-apps-and-channels-settings
-#   a (click)
-
-# quickest:
-#   div: AppFrameTopBar
-#   btn: class="_TopBarButton_ale7v_2 _SearchActivator_8d1vr_4"
-#   div: search-container -> input: role="combobox"
-#   type text
-#   div: class="_SearchResultSection_izb45_1"
-#   li: gid://shopify/SettingsLink/apps|list
-#   a: click
