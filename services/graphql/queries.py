@@ -64,8 +64,8 @@ ADD_PRODUCT_COLLECTION_QUERY = (
 )
 
 PUBLISH_PRODUCT_QUERY = (
-    "mutation productPublish($productId: ID!, $publicationId: ID!) {"
-    "  productPublish(productId: $productId, publicationId: $publicationId) {"
+    "mutation productPublish($input: ProductPublishInput!) {"
+    "  productPublish(input: $input) {"
     "    product { id title }"
     "    userErrors { field message }"
     "  }"

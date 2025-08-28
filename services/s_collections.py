@@ -30,6 +30,10 @@ def create_collection(
         CREATE_COLLECTION_QUERY,
         {"input": {"title": title}},
     )
+    if not data.get("data"):
+        print(f"Failed to create collection '{title}'. Response: {data}")
+        raise ValueError("Collection creation failed")
+
     return data["data"]["collectionCreate"]["collection"]["id"]
 
 
@@ -114,15 +118,16 @@ def publish_collections(
         list[str]: A list of published collection IDs.
     """
     published_collection_ids = []
-    for collection_id in collection_ids:
-        published_id = publish_collection(
-            store_url, access_token, collection_id, publication_id
-        )
+    with httpx.Client() as client:
+        for collection_id in collection_ids:
+            published_id = publish_collection(
+                client, store_url, access_token, collection_id, publication_id
+            )
 
-        if not published_id:
-            print(f"Failed to publish collection with ID {collection_id}.")
-            continue
-        published_collection_ids.append(published_id)
-        print(f"Collection with ID {collection_id} published successfully.")
+            if not published_id:
+                print(f"Failed to publish collection with ID {collection_id}.")
+                continue
+            published_collection_ids.append(published_id)
+            print(f"Collection with ID {collection_id} published successfully.")
 
     return published_collection_ids

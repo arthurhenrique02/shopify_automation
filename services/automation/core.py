@@ -3,6 +3,7 @@ import pathlib
 import typing
 
 from dotenv import load_dotenv
+from httpx import Client
 from selenium.common import WebDriverException
 
 from services.automation.auth import login
@@ -75,7 +76,7 @@ def automation_main(
             card_id=card_id,
             list_id=next(
                 filter(
-                    lambda x: "EMAIL ERRADO" in x["name"],
+                    lambda x: "EMAIL DE LOGIN ERRADO" in x["name"],
                     trello_lists,
                 ),
                 None,
@@ -163,14 +164,17 @@ def automation_main(
         return
 
     # === PUBLICATIONS ===
-    publications = graphql_request(
-        store_url=store_url,
-        access_token=custom_app_api_key,
-        query="{publications(first: 2) { edges { node { id name } } } }",
-        variables=None,
-    )
+    with Client() as client:
+        publications = graphql_request(
+            store_url=store_url,
+            access_token=custom_app_api_key,
+            query="{publications(first: 2) { edges { node { id name } } } }",
+            variables=None,
+            client=client,
+        )
 
     for publication in publications["data"]["publications"]["edges"]:
+        print(publication)
         if publication["node"]["name"] != "Online Store":
             continue
 
@@ -213,7 +217,7 @@ def automation_main(
     upload_shopify_theme(
         theme_id=theme_id,
         folder_path=theme_folder,
-        store_name=store_url,
+        store_url=store_url,
         password=custom_app_api_key,
     )
 

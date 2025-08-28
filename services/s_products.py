@@ -191,8 +191,17 @@ def publish_product(
         store_url,
         access_token,
         PUBLISH_PRODUCT_QUERY,
-        {"productId": product_id, "publicationId": publication_id},
+        {
+            "input": {
+                "id": product_id,
+                "productPublications": [{"publicationId": publication_id}],
+            }
+        },
     )
+    if not data.get("data"):
+        print(f"Failed to publish product {product_id}. Response: {data}")
+        raise ValueError("Publishing failed")
+
     return data["data"]["productPublish"]["product"]["id"]
 
 
@@ -210,10 +219,11 @@ def publish_products(
         list[str]: A list of IDs of the published products.
     """
     published_product_ids = []
-    for product_id in product_ids:
-        published_product_id = publish_product(
-            store_url, access_token, product_id, publication_id
-        )
-        print(f"Product {product_id} published with ID: {published_product_id}")
-        published_product_ids.append(published_product_id)
+    with httpx.Client() as client:
+        for product_id in product_ids:
+            published_product_id = publish_product(
+                client, store_url, access_token, product_id, publication_id
+            )
+            print(f"Product {product_id} published with ID: {published_product_id}")
+            published_product_ids.append(published_product_id)
     return published_product_ids
